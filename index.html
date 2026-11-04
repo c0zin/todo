@@ -286,8 +286,7 @@
 
     <!-- App Logic -->
     <script>
-        // URL-ul /exec al scriptului Google (Implementare -> Aplicație web)
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzIepFASKkJLzDpqSiNw9XJqv8WJsbRJJQ1blLqlC9kmHOf_SPgVy0N_oPC3g1lD_gr/exec';
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbypL-i8Os6EJYp3lbFMY25FU8BpVneUKeCeURhL0_tr21EaLQ7Kb2UoaRkqoz5wJ-Od/exec';
         let currentYear = 2026;
         let currentMonth = 10; // Noiembrie
         let records = [];
@@ -347,7 +346,6 @@
         function formatDateStr(dStr) {
             if (!dStr) return '';
             dStr = String(dStr);
-            // Dacă vine ca dată ISO în UTC (ex: 2026-11-02T22:00:00.000Z), o convertim la ziua locală
             if (dStr.includes('T')) {
                 const d = new Date(dStr);
                 return isNaN(d) ? dStr.split('T')[0] : localDateStr(d);
@@ -383,8 +381,11 @@
         async function fetchDataFromCloud() {
             if (!scriptConfigured()) return false;
             try {
-                // parametrul t evită răspunsuri din cache
-                const response = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`);
+                // adăugăm redirect: 'follow' pentru ca browserul să urmărească redirect-ul intern Google
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?app=todo&t=${Date.now()}`, {
+                    method: 'GET',
+                    redirect: 'follow'
+                });
                 const result = await response.json();
                 if (result.result !== 'success' || !Array.isArray(result.data)) throw new Error(result.message || 'Răspuns neașteptat');
 
@@ -425,6 +426,7 @@
             showSync('Se salvează în Google Sheets...', 'info');
 
             const body = JSON.stringify({
+                app: 'todo',
                 action: actionType,
                 id: recordData.id,
                 judet: recordData.county,
@@ -440,16 +442,12 @@
             try {
                 let confirmed = false;
                 try {
-                    // text/plain = cerere "simplă", fără preflight CORS; așa putem citi răspunsul scriptului
                     const resp = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
                     const res = await resp.json();
                     if (res && res.result === 'error') throw new Error(res.message || 'Eroare script');
                     confirmed = true;
                 } catch (corsErr) {
-                    // eroare de rețea/CORS (TypeError) sau răspuns ne-JSON (SyntaxError) -> retrimitem no-cors;
-                    // o eroare raportată de script o afișăm
                     if (!(corsErr instanceof TypeError) && !(corsErr instanceof SyntaxError)) throw corsErr;
-                    // fallback: scriptul face upsert după ID, deci retrimiterea nu dublează rândul
                     await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
                 }
 
@@ -464,7 +462,6 @@
             }
         }
 
-        // Ziua în care apare sarcina în calendar: data planificată, iar la cele fără dată ziua rezolvării
         function calendarDay(r) {
             return r.date || (r.status === 'Rezolvat' ? r.resolvedAt : '');
         }
@@ -536,7 +533,6 @@
                 const done = items.filter(r => r.status === 'Rezolvat');
                 const isToday = dayStr === todayStr;
 
-                // culoarea zilei: depășit > planificat > rezolvat
                 let bgClass = 'bg-white border-slate-200 hover:border-indigo-400';
                 let todayTag = 'bg-blue-100 text-blue-700';
                 if (overdue.length) {
@@ -624,14 +620,12 @@
                 task: document.getElementById('task').value.trim(),
                 date: document.getElementById('task-date').value,
                 note: document.getElementById('note').value.trim(),
-                // la editare păstrăm statusul și rezolvarea
                 status: existing ? existing.status : 'Deschis',
                 resolvedAt: existing ? existing.resolvedAt : '',
                 resolution: existing ? existing.resolution : ''
             };
             if (!recordData.task) return;
 
-            // afișăm imediat modificarea, apoi confirmăm din Sheet
             if (existing) Object.assign(existing, recordData);
             else records.push(recordData);
             renderApp();
@@ -669,7 +663,6 @@
             document.getElementById('task').focus();
         }
 
-        // defaultDate = ziua pe care s-a dat click în calendar (implicit azi)
         function openResolveModal(id, defaultDate) {
             const record = records.find(r => r.id === id);
             if (!record) return;
@@ -699,7 +692,6 @@
             saveToCloud('resolve', record);
         }
 
-        // Bifat din greșeală sau nu s-a terminat: sarcina redevine de făcut (textul de la rezolvare rămâne)
         function reopenRecord(id) {
             const record = records.find(r => r.id === id);
             if (!record || record.status === 'Deschis') return;
@@ -734,7 +726,6 @@
             return `<span class="bg-indigo-100 text-indigo-700 font-bold text-[11px] px-2.5 py-1 rounded-full inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i>De făcut</span>`;
         }
 
-        // big = butonul din fereastra zilei; dayStr = ziua pe care s-a dat click
         function resolveButton(r, big, dayStr) {
             const id = esc(r.id);
             if (big) {
@@ -767,7 +758,6 @@
                 const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
                 return matchesSearch && matchesCounty && matchesStatus;
             }).sort((a, b) => {
-                // întâi cele de făcut (după dată, cele fără dată la final), apoi rezolvatele, cele mai noi primele
                 if (a.status !== b.status) return a.status === 'Deschis' ? -1 : 1;
                 if (a.status === 'Rezolvat') return (b.resolvedAt || '').localeCompare(a.resolvedAt || '');
                 return (a.date || '9999').localeCompare(b.date || '9999');
