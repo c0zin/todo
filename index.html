@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo Site-uri</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md py-4 px-6 flex flex-wrap justify-between items-center">
+        <div class="flex items-center space-x-3 mb-2 md:mb-0">
+            <div class="bg-indigo-600 p-2 rounded-lg">
+                <i class="fa-solid fa-list-check text-xl"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-wide">Todo Site-uri</h1>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex flex-wrap gap-2 bg-slate-800 p-1 rounded-xl">
+            <button id="tab-calendar-btn" onclick="switchTab('calendar')" class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white transition">
+                <i class="fa-solid fa-calendar-days mr-2"></i>Calendar
+            </button>
+            <button id="tab-records-btn" onclick="switchTab('records')" class="px-4 py-2 text-sm font-medium rounded-lg text-slate-300 hover:bg-slate-700 transition">
+                <i class="fa-solid fa-list-ul mr-2"></i>Toate Sarcinile
+                <span id="badge-open-count" class="ml-1 px-2 py-0.5 text-xs bg-indigo-500 text-white font-bold rounded-full">0</span>
+            </button>
+            <a id="open-sheet-btn" href="#" target="_blank" rel="noopener" class="hidden px-4 py-2 text-sm font-medium rounded-lg text-slate-300 hover:bg-slate-700 transition">
+                <i class="fa-solid fa-table mr-2"></i>Deschide Google Sheet
+            </a>
+        </nav>
+    </header>
+
+    <!-- Sync status bar -->
+    <div id="sync-bar" class="hidden text-center text-xs py-1.5"></div>
+
+    <!-- Main Container -->
+    <main class="flex-grow container mx-auto px-4 py-6 max-w-7xl">
+
+        <!-- Dashboard Stats Widgets -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase font-semibold text-slate-500">De Făcut</p>
+                    <h3 id="stat-open" class="text-2xl font-black text-indigo-600">0</h3>
+                </div>
+                <div class="hidden sm:flex w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 items-center justify-center text-xl">
+                    <i class="fa-solid fa-list-check"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase font-semibold text-slate-500">Depășite</p>
+                    <h3 id="stat-overdue" class="text-2xl font-black text-red-600">0</h3>
+                </div>
+                <div class="hidden sm:flex w-12 h-12 rounded-full bg-red-100 text-red-600 items-center justify-center text-xl">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase font-semibold text-slate-500">Fără Dată</p>
+                    <h3 id="stat-nodate" class="text-2xl font-black text-amber-600">0</h3>
+                </div>
+                <div class="hidden sm:flex w-12 h-12 rounded-full bg-amber-100 text-amber-600 items-center justify-center text-xl">
+                    <i class="fa-solid fa-hourglass-half"></i>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center justify-between">
+                <div>
+                    <p class="text-xs uppercase font-semibold text-slate-500">Rezolvate</p>
+                    <h3 id="stat-done" class="text-2xl font-black text-emerald-600">0</h3>
+                </div>
+                <div class="hidden sm:flex w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 items-center justify-center text-xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 1: CALENDAR & FORMULAR -->
+        <div id="tab-calendar" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-1 space-y-6">
+                <!-- Add/Edit Form -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+                        <h2 id="form-title" class="text-lg font-bold text-slate-800">
+                            <i class="fa-solid fa-plus-circle text-indigo-600 mr-2"></i>Sarcină Nouă
+                        </h2>
+                        <button id="cancel-edit-btn" onclick="resetForm()" class="hidden text-xs text-slate-500 hover:text-slate-800 underline">
+                            Anulează editarea
+                        </button>
+                    </div>
+
+                    <form id="task-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                        <input type="hidden" id="entry-id">
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Cod Site</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-tower-cell absolute left-3 top-3 text-slate-400 text-sm"></i>
+                                <input type="text" id="site-code" oninput="updateCountyHint()" placeholder="Ex: DJTK50312" class="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                            </div>
+                            <p id="county-hint" class="text-[11px] text-slate-500 mt-1">Județul se ia automat din primele 2 litere (DJ, GJ, MH, OT).</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Ce e de făcut *</label>
+                            <textarea id="task" rows="2" required placeholder="Ex: De adăugat un redresor" class="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Când</label>
+                            <div class="flex gap-2">
+                                <input type="date" id="task-date" class="flex-grow min-w-0 p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                                <button type="button" onclick="setFormDate(0)" class="px-2.5 text-xs font-medium border border-slate-300 rounded-lg hover:bg-slate-100">Azi</button>
+                                <button type="button" onclick="setFormDate(1)" class="px-2.5 text-xs font-medium border border-slate-300 rounded-lg hover:bg-slate-100">Mâine</button>
+                                <button type="button" onclick="setFormDate(null)" title="Fără dată" class="px-2.5 text-xs font-medium border border-slate-300 rounded-lg hover:bg-slate-100"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
+                            <p class="text-[11px] text-slate-500 mt-1">Lasă gol dacă nu știi încă când ajungi. Sarcina apare la „De făcut cândva”.</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Notiță</label>
+                            <textarea id="note" rows="2" placeholder="Ex: Redresorul e în depozit la Craiova" class="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                        </div>
+
+                        <button type="submit" id="submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg text-sm transition shadow-sm flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                            <span>Salvează Sarcina</span>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Undated tasks -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                        <h2 class="text-base font-bold text-slate-800">
+                            <i class="fa-solid fa-hourglass-half text-amber-500 mr-2"></i>De făcut cândva
+                        </h2>
+                        <span id="nodate-count" class="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded-full">0</span>
+                    </div>
+                    <div id="nodate-list" class="space-y-2">
+                        <!-- Generated via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Calendar View -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 lg:col-span-2 flex flex-col self-start">
+                <div class="flex flex-wrap items-center justify-between pb-4 border-b border-slate-100 gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 id="calendar-month-year" class="text-lg font-bold text-slate-800 mr-1">Noiembrie 2026</h2>
+                        <span class="text-[11px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded-md font-medium"><i class="fa-solid fa-square mr-1"></i>Planificat</span>
+                        <span class="text-[11px] bg-red-100 text-red-700 px-2 py-1 rounded-md font-medium"><i class="fa-solid fa-square mr-1"></i>Depășit</span>
+                        <span class="text-[11px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-medium"><i class="fa-solid fa-square mr-1"></i>Rezolvat</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="changeMonth(-1)" class="p-2 border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 text-sm"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="goToToday()" class="px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-700 text-xs font-medium">Azi</button>
+                        <button onclick="changeMonth(1)" class="p-2 border border-slate-300 rounded-lg hover:bg-slate-100 text-slate-600 text-sm"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <!-- Calendar Grid Header -->
+                <div class="grid grid-cols-7 text-center font-bold text-xs text-slate-500 py-3 border-b border-slate-200">
+                    <div>LUN</div>
+                    <div>MAR</div>
+                    <div>MIE</div>
+                    <div>JOI</div>
+                    <div>VIN</div>
+                    <div>SÂM</div>
+                    <div>DUM</div>
+                </div>
+
+                <!-- Calendar Days Grid -->
+                <div id="calendar-grid" class="grid grid-cols-7 auto-rows-fr gap-1 pt-2 min-h-[360px]">
+                    <!-- Generated via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: TOATE SARCINILE -->
+        <div id="tab-records" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">Toate Sarcinile</h2>
+                    <p class="text-xs text-slate-500">Caută după site ca să vezi tot ce e de făcut acolo</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="text" id="search-input" oninput="renderRecordsTable()" placeholder="Caută site, sarcină, notiță..." class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg outline-none w-44 sm:w-56">
+
+                    <select id="filter-county" onchange="renderRecordsTable()" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg outline-none">
+                        <option value="ALL">Toate Județele</option>
+                        <option value="Gorj">Gorj</option>
+                        <option value="Mehedinti">Mehedinți</option>
+                        <option value="Dolj">Dolj</option>
+                        <option value="Olt">Olt</option>
+                    </select>
+
+                    <select id="filter-status" onchange="renderRecordsTable()" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg outline-none">
+                        <option value="Deschis">De făcut</option>
+                        <option value="Rezolvat">Rezolvate</option>
+                        <option value="ALL">Toate</option>
+                    </select>
+
+                    <button onclick="fetchDataFromCloud()" title="Reîmprospătează datele din Google Sheets" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center space-x-1">
+                        <i class="fa-solid fa-rotate mr-1"></i> Sincronizează
+                    </button>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs sm:text-sm">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 border-b border-slate-200">
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Județ</th>
+                            <th class="p-3">Cod Site</th>
+                            <th class="p-3">Sarcină</th>
+                            <th class="p-3">Când</th>
+                            <th class="p-3">Rezolvare</th>
+                            <th class="p-3 text-right">Acțiuni</th>
+                        </tr>
+                    </thead>
+                    <tbody id="records-table-body" class="divide-y divide-slate-200">
+                        <!-- Generated via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal details for day click -->
+    <div id="day-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-40">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-5 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 id="modal-date-title" class="font-bold text-slate-800 text-base">Sarcini pe data</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="modal-content" class="py-4 space-y-3">
+                <!-- Data populated dynamically -->
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex justify-between">
+                <button onclick="addOnModalDate()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg"><i class="fa-solid fa-plus mr-1"></i>Adaugă în ziua asta</button>
+                <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg">Închide</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: mark as resolved -->
+    <div id="resolve-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <form onsubmit="confirmResolve(event)" class="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-5">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-base"><i class="fa-solid fa-circle-check text-emerald-600 mr-2"></i>Marchează rezolvat</h3>
+                <button type="button" onclick="closeResolveModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="py-4 space-y-3">
+                <input type="hidden" id="resolve-id">
+                <p id="resolve-task" class="text-sm font-semibold text-slate-800"></p>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Rezolvat pe</label>
+                    <input type="date" id="resolve-date" required class="w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Câteva vorbe</label>
+                    <textarea id="resolve-text" rows="3" placeholder="Ex: Rezolvat Răzvan, Sabin a mai adăugat un patch" class="w-full p-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+                </div>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex justify-end gap-2">
+                <button type="button" onclick="closeResolveModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg">Anulează</button>
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg"><i class="fa-solid fa-check mr-1"></i>Rezolvat</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-3 px-6 text-center text-xs text-slate-500">
+        Todo Site-uri
+    </footer>
+
+    <!-- App Logic -->
+    <script>
+        // URL-ul /exec al scriptului Google (Implementare -> Aplicație web)
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxVe6Uxmisc2_H3x8KBsh6K4swV8XqGn8zuOqMMFLRubZtXXj4Q1oEdxSjahxvD1zWA/exec';
+        let currentYear = 2026;
+        let currentMonth = 10; // Noiembrie
+        let records = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const today = new Date();
+            currentYear = today.getFullYear();
+            currentMonth = today.getMonth();
+            renderApp();
+            fetchDataFromCloud();
+        });
+
+        // Data locală (nu UTC) în format YYYY-MM-DD
+        function localDateStr(d = new Date()) {
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        // Județul din primele 2 litere ale codului de site (ex: DJTK50312 -> Dolj)
+        const COUNTY_PREFIX = { DJ: 'Dolj', GJ: 'Gorj', MH: 'Mehedinti', OT: 'Olt' };
+        function countyFromSite(site) {
+            return COUNTY_PREFIX[String(site || '').trim().substring(0, 2).toUpperCase()] || '';
+        }
+
+        function updateCountyHint() {
+            const site = document.getElementById('site-code').value;
+            const county = countyFromSite(site);
+            const hint = document.getElementById('county-hint');
+            if (!site.trim()) {
+                hint.className = 'text-[11px] text-slate-500 mt-1';
+                hint.textContent = 'Județul se ia automat din primele 2 litere (DJ, GJ, MH, OT).';
+            } else if (county) {
+                hint.className = 'text-[11px] text-emerald-700 font-semibold mt-1';
+                hint.textContent = `Județ: ${county}`;
+            } else {
+                hint.className = 'text-[11px] text-amber-600 font-semibold mt-1';
+                hint.textContent = 'Nu recunosc județul (codul nu începe cu DJ, GJ, MH sau OT).';
+            }
+        }
+
+        // offset în zile față de azi; null = fără dată
+        function setFormDate(offset) {
+            const input = document.getElementById('task-date');
+            if (offset === null) { input.value = ''; return; }
+            const d = new Date();
+            d.setDate(d.getDate() + offset);
+            input.value = localDateStr(d);
+        }
+
+        function normalizeStatus(st) {
+            return String(st || '').toLowerCase().startsWith('rezolv') ? 'Rezolvat' : 'Deschis';
+        }
+
+        function formatDateStr(dStr) {
+            if (!dStr) return '';
+            dStr = String(dStr);
+            // Dacă vine ca dată ISO în UTC (ex: 2026-11-02T22:00:00.000Z), o convertim la ziua locală
+            if (dStr.includes('T')) {
+                const d = new Date(dStr);
+                return isNaN(d) ? dStr.split('T')[0] : localDateStr(d);
+            }
+            return dStr.substring(0, 10);
+        }
+
+        function prettyDate(d) {
+            if (!d) return '';
+            const [y, m, day] = d.split('-');
+            return `${day}.${m}.${y}`;
+        }
+
+        function showSync(msg, type) {
+            const bar = document.getElementById('sync-bar');
+            const colors = {
+                info: 'bg-blue-50 text-blue-700',
+                ok: 'bg-emerald-50 text-emerald-700',
+                error: 'bg-red-100 text-red-700 font-semibold'
+            };
+            bar.className = `text-center text-xs py-1.5 ${colors[type] || colors.info}`;
+            bar.textContent = msg;
+            clearTimeout(showSync._t);
+            if (type === 'ok') showSync._t = setTimeout(() => bar.classList.add('hidden'), 2500);
+        }
+
+        function scriptConfigured() {
+            if (/^https:\/\/script\.google\.com\//.test(GOOGLE_SCRIPT_URL)) return true;
+            showSync('Aplicația nu e legată încă de Google Sheets: pune URL-ul /exec al scriptului în index.html (GOOGLE_SCRIPT_URL).', 'error');
+            return false;
+        }
+
+        async function fetchDataFromCloud() {
+            if (!scriptConfigured()) return false;
+            try {
+                // parametrul t evită răspunsuri din cache
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`);
+                const result = await response.json();
+                if (result.result !== 'success' || !Array.isArray(result.data)) throw new Error(result.message || 'Răspuns neașteptat');
+
+                if (result.sheetUrl) {
+                    const a = document.getElementById('open-sheet-btn');
+                    a.href = result.sheetUrl;
+                    a.classList.remove('hidden');
+                }
+
+                records = result.data
+                    .map(r => ({
+                        id: String(r.ID || ''),
+                        county: countyFromSite(r.Site) || r.Judet || '',
+                        site: r.Site || '',
+                        task: r.Sarcina || '',
+                        date: formatDateStr(r.Data),
+                        status: normalizeStatus(r.Status),
+                        note: r.Notita || '',
+                        resolvedAt: formatDateStr(r.RezolvatLa),
+                        resolution: r.Rezolvare || '',
+                        modifiedAt: r.ModificatLa || ''
+                    }))
+                    .filter(r => r.id && r.task);
+
+                renderApp();
+                return true;
+            } catch (err) {
+                console.error("Eroare la preluarea datelor din Cloud:", err);
+                showSync('Nu s-au putut citi datele din Google Sheets. Verifică conexiunea / publicarea scriptului.', 'error');
+                return false;
+            }
+        }
+
+        async function saveToCloud(actionType, recordData) {
+            if (!scriptConfigured()) return;
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            showSync('Se salvează în Google Sheets...', 'info');
+
+            const body = JSON.stringify({
+                action: actionType,
+                id: recordData.id,
+                judet: recordData.county,
+                site: recordData.site,
+                sarcina: recordData.task,
+                data: recordData.date,
+                status: recordData.status,
+                notita: recordData.note,
+                rezolvatLa: recordData.resolvedAt || '',
+                rezolvare: recordData.resolution || ''
+            });
+
+            try {
+                let confirmed = false;
+                try {
+                    // text/plain = cerere "simplă", fără preflight CORS; așa putem citi răspunsul scriptului
+                    const resp = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+                    const res = await resp.json();
+                    if (res && res.result === 'error') throw new Error(res.message || 'Eroare script');
+                    confirmed = true;
+                } catch (corsErr) {
+                    // eroare de rețea/CORS (TypeError) sau răspuns ne-JSON (SyntaxError) -> retrimitem no-cors;
+                    // o eroare raportată de script o afișăm
+                    if (!(corsErr instanceof TypeError) && !(corsErr instanceof SyntaxError)) throw corsErr;
+                    // fallback: scriptul face upsert după ID, deci retrimiterea nu dublează rândul
+                    await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body });
+                }
+
+                const ok = await fetchDataFromCloud();
+                if (ok) showSync(confirmed ? 'Salvat în Google Sheets ✓' : 'Trimis către Google Sheets ✓', 'ok');
+            } catch (err) {
+                console.error(err);
+                showSync('Eroare la salvare în Google Sheets: ' + err.message, 'error');
+                fetchDataFromCloud();
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Ziua în care apare sarcina în calendar: data planificată, iar la cele fără dată ziua rezolvării
+        function calendarDay(r) {
+            return r.date || (r.status === 'Rezolvat' ? r.resolvedAt : '');
+        }
+
+        function isOverdue(r) {
+            return r.status === 'Deschis' && r.date && r.date < localDateStr();
+        }
+
+        function renderApp() {
+            renderCalendar();
+            renderNoDateList();
+            renderRecordsTable();
+            updateStats();
+        }
+
+        function switchTab(tab) {
+            const calTab = document.getElementById('tab-calendar');
+            const recTab = document.getElementById('tab-records');
+            const calBtn = document.getElementById('tab-calendar-btn');
+            const recBtn = document.getElementById('tab-records-btn');
+            const on = 'px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white transition';
+            const off = 'px-4 py-2 text-sm font-medium rounded-lg text-slate-300 hover:bg-slate-700 transition';
+
+            calTab.classList.toggle('hidden', tab !== 'calendar');
+            recTab.classList.toggle('hidden', tab === 'calendar');
+            calBtn.className = tab === 'calendar' ? on : off;
+            recBtn.className = tab === 'calendar' ? off : on;
+        }
+
+        const monthNames = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            else if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+        }
+
+        function goToToday() {
+            const today = new Date();
+            currentYear = today.getFullYear();
+            currentMonth = today.getMonth();
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            document.getElementById('calendar-month-year').textContent = `${monthNames[currentMonth]} ${currentYear}`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
+            const adjustedFirstDay = (firstDayIndex === 0) ? 6 : firstDayIndex - 1;
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+            for (let i = 0; i < adjustedFirstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'bg-slate-50/50 rounded-lg p-1 border border-slate-100 min-h-[55px] opacity-40';
+                grid.appendChild(emptyCell);
+            }
+
+            const todayStr = localDateStr();
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                const items = records.filter(r => calendarDay(r) === dayStr);
+                const overdue = items.filter(isOverdue);
+                const open = items.filter(r => r.status === 'Deschis' && !isOverdue(r));
+                const done = items.filter(r => r.status === 'Rezolvat');
+                const isToday = dayStr === todayStr;
+
+                // culoarea zilei: depășit > planificat > rezolvat
+                let bgClass = 'bg-white border-slate-200 hover:border-indigo-400';
+                let todayTag = 'bg-blue-100 text-blue-700';
+                if (overdue.length) {
+                    bgClass = 'bg-red-500 text-white border-red-600 shadow-sm hover:bg-red-600';
+                    todayTag = 'bg-white text-red-600';
+                } else if (open.length) {
+                    bgClass = 'bg-indigo-500 text-white border-indigo-600 shadow-sm hover:bg-indigo-600';
+                    todayTag = 'bg-white text-indigo-700';
+                } else if (done.length) {
+                    bgClass = 'bg-emerald-500 text-white border-emerald-600 shadow-sm hover:bg-emerald-600';
+                    todayTag = 'bg-white text-emerald-700';
+                }
+                const colored = items.length > 0;
+
+                const dayCell = document.createElement('div');
+                dayCell.onclick = () => openDayModal(dayStr);
+                dayCell.className = `rounded-lg p-1.5 border flex flex-col justify-start transition min-h-[58px] cursor-pointer overflow-hidden ${bgClass} ${isToday ? 'ring-2 ring-blue-500 font-bold' : ''}`;
+
+                let html = `<div class="flex justify-between items-center"><span class="text-xs font-semibold ${colored ? 'text-white' : 'text-slate-700'}">${day}</span>`;
+                if (isToday) html += `<span class="text-[9px] ${todayTag} px-1 rounded font-bold">AZI</span>`;
+                html += `</div>`;
+
+                if (colored) {
+                    const shown = [...overdue, ...open, ...done];
+                    html += `<div class="mt-1 space-y-0.5">`;
+                    shown.slice(0, 2).forEach(item => {
+                        const chip = isOverdue(item) ? 'bg-red-700/60' : item.status === 'Deschis' ? 'bg-indigo-800/50' : 'bg-emerald-700/60';
+                        const icon = item.status === 'Rezolvat' ? '<i class="fa-solid fa-check mr-0.5"></i>' : '';
+                        const label = item.site || item.task;
+                        html += `<div class="text-[9px] truncate ${chip} text-white px-1 rounded font-medium">${icon}${esc(label)}</div>`;
+                    });
+                    if (shown.length > 2) {
+                        html += `<div class="text-[8px] font-bold text-white/80">+ încă ${shown.length - 2}</div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                dayCell.innerHTML = html;
+                grid.appendChild(dayCell);
+            }
+        }
+
+        function renderNoDateList() {
+            const list = document.getElementById('nodate-list');
+            const items = records.filter(r => r.status === 'Deschis' && !r.date);
+            document.getElementById('nodate-count').textContent = items.length;
+            if (!items.length) {
+                list.innerHTML = `<p class="text-xs text-slate-400 italic">Nimic în așteptare.</p>`;
+                return;
+            }
+            list.innerHTML = items.map(r => `
+                <div class="p-2.5 rounded-lg border border-amber-200 bg-amber-50">
+                    <div class="flex justify-between items-start gap-2">
+                        <div class="min-w-0">
+                            ${r.site ? `<p class="text-xs font-bold text-slate-800">${r.county ? `[${esc(r.county)}] ` : ''}${esc(r.site)}</p>` : ''}
+                            <p class="text-xs text-slate-700">${esc(r.task)}</p>
+                            ${r.note ? `<p class="text-[11px] text-slate-500 mt-0.5">${esc(r.note)}</p>` : ''}
+                        </div>
+                        <div class="flex gap-1 shrink-0">
+                            <button onclick="openResolveModal('${esc(r.id)}')" title="Rezolvat" class="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md text-xs"><i class="fa-solid fa-check"></i></button>
+                            <button onclick="editRecord('${esc(r.id)}')" title="Editează / planifică" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md text-xs"><i class="fa-solid fa-pen"></i></button>
+                        </div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function updateStats() {
+            const open = records.filter(r => r.status === 'Deschis');
+            document.getElementById('stat-open').textContent = open.length;
+            document.getElementById('stat-overdue').textContent = open.filter(isOverdue).length;
+            document.getElementById('stat-nodate').textContent = open.filter(r => !r.date).length;
+            document.getElementById('stat-done').textContent = records.length - open.length;
+            document.getElementById('badge-open-count').textContent = open.length;
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const id = document.getElementById('entry-id').value;
+            const existing = id ? records.find(r => r.id === id) : null;
+            const site = document.getElementById('site-code').value.trim();
+            const recordData = {
+                id: id || ('T_' + Date.now()),
+                county: countyFromSite(site) || (existing && existing.site === site ? existing.county : ''),
+                site,
+                task: document.getElementById('task').value.trim(),
+                date: document.getElementById('task-date').value,
+                note: document.getElementById('note').value.trim(),
+                // la editare păstrăm statusul și rezolvarea
+                status: existing ? existing.status : 'Deschis',
+                resolvedAt: existing ? existing.resolvedAt : '',
+                resolution: existing ? existing.resolution : ''
+            };
+            if (!recordData.task) return;
+
+            // afișăm imediat modificarea, apoi confirmăm din Sheet
+            if (existing) Object.assign(existing, recordData);
+            else records.push(recordData);
+            renderApp();
+
+            saveToCloud(id ? 'edit' : 'add', recordData);
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('task-form').reset();
+            document.getElementById('entry-id').value = '';
+            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-plus-circle text-indigo-600 mr-2"></i>Sarcină Nouă`;
+            document.getElementById('submit-btn').innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i> <span>Salvează Sarcina</span>`;
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+            updateCountyHint();
+        }
+
+        function editRecord(id) {
+            const record = records.find(r => r.id === id);
+            if (!record) return;
+
+            switchTab('calendar');
+            closeModal();
+            document.getElementById('entry-id').value = record.id;
+            document.getElementById('site-code').value = record.site;
+            document.getElementById('task').value = record.task;
+            document.getElementById('task-date').value = record.date;
+            document.getElementById('note').value = record.note;
+            updateCountyHint();
+
+            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-pen-to-square text-blue-600 mr-2"></i>Editează Sarcina`;
+            document.getElementById('submit-btn').innerHTML = `<i class="fa-solid fa-floppy-disk"></i> <span>Actualizează</span>`;
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('task').focus();
+        }
+
+        // defaultDate = ziua pe care s-a dat click în calendar (implicit azi)
+        function openResolveModal(id, defaultDate) {
+            const record = records.find(r => r.id === id);
+            if (!record) return;
+            const today = localDateStr();
+            document.getElementById('resolve-id').value = id;
+            document.getElementById('resolve-task').textContent = `${record.site ? record.site + ' · ' : ''}${record.task}`;
+            document.getElementById('resolve-date').value = defaultDate && defaultDate < today ? defaultDate : today;
+            document.getElementById('resolve-text').value = record.resolution;
+            document.getElementById('resolve-modal').classList.remove('hidden');
+            document.getElementById('resolve-text').focus();
+        }
+
+        function closeResolveModal() {
+            document.getElementById('resolve-modal').classList.add('hidden');
+        }
+
+        function confirmResolve(e) {
+            e.preventDefault();
+            const record = records.find(r => r.id === document.getElementById('resolve-id').value);
+            if (!record) return closeResolveModal();
+            record.status = 'Rezolvat';
+            record.resolvedAt = document.getElementById('resolve-date').value;
+            record.resolution = document.getElementById('resolve-text').value.trim();
+            closeResolveModal();
+            renderApp();
+            refreshOpenModal();
+            saveToCloud('resolve', record);
+        }
+
+        // Bifat din greșeală sau nu s-a terminat: sarcina redevine de făcut (textul de la rezolvare rămâne)
+        function reopenRecord(id) {
+            const record = records.find(r => r.id === id);
+            if (!record || record.status === 'Deschis') return;
+            if (!confirm(`Redeschid sarcina „${record.task}”?`)) return;
+            record.status = 'Deschis';
+            record.resolvedAt = '';
+            renderApp();
+            refreshOpenModal();
+            saveToCloud('reopen', record);
+        }
+
+        function deleteRecord(id) {
+            const record = records.find(r => r.id === id);
+            if (!record) return;
+            if (!confirm(`Sigur ștergi sarcina „${record.task}”? Dispare și din Google Sheet.`)) return;
+            records = records.filter(r => r.id !== id);
+            renderApp();
+            refreshOpenModal();
+            saveToCloud('delete', record);
+        }
+
+        function statusBadge(r) {
+            if (r.status === 'Rezolvat') {
+                return `<span class="bg-emerald-100 text-emerald-700 font-bold text-[11px] px-2.5 py-1 rounded-full inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-check text-[10px] mr-1.5"></i>Rezolvat</span>`;
+            }
+            if (isOverdue(r)) {
+                return `<span class="bg-red-100 text-red-700 font-bold text-[11px] px-2.5 py-1 rounded-full inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-circle text-[8px] mr-1.5 animate-pulse"></i>Depășit</span>`;
+            }
+            if (!r.date) {
+                return `<span class="bg-amber-100 text-amber-700 font-bold text-[11px] px-2.5 py-1 rounded-full inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-hourglass-half text-[10px] mr-1.5"></i>Cândva</span>`;
+            }
+            return `<span class="bg-indigo-100 text-indigo-700 font-bold text-[11px] px-2.5 py-1 rounded-full inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i>De făcut</span>`;
+        }
+
+        // big = butonul din fereastra zilei; dayStr = ziua pe care s-a dat click
+        function resolveButton(r, big, dayStr) {
+            const id = esc(r.id);
+            if (big) {
+                return r.status === 'Deschis'
+                    ? `<button onclick="openResolveModal('${id}', '${dayStr}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg"><i class="fa-solid fa-check mr-1"></i>Rezolvat</button>`
+                    : `<button onclick="reopenRecord('${id}')" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-lg"><i class="fa-solid fa-rotate-left mr-1"></i>Redeschide</button>`;
+            }
+            return r.status === 'Deschis'
+                ? `<button onclick="openResolveModal('${id}')" title="Rezolvat" class="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-md text-xs font-semibold"><i class="fa-solid fa-check"></i></button>`
+                : `<button onclick="reopenRecord('${id}')" title="Redeschide" class="p-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-md text-xs font-semibold"><i class="fa-solid fa-rotate-left"></i></button>`;
+        }
+
+        function resolutionText(r) {
+            if (r.status !== 'Rezolvat') return r.resolution ? `<span class="text-slate-400">${esc(r.resolution)}</span>` : '-';
+            return `${r.resolution ? esc(r.resolution) : '<span class="text-slate-400 italic">fără detalii</span>'}<div class="text-[11px] text-slate-400">${prettyDate(r.resolvedAt)}</div>`;
+        }
+
+        function renderRecordsTable() {
+            const tbody = document.getElementById('records-table-body');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const countyFilter = document.getElementById('filter-county').value;
+            const statusFilter = document.getElementById('filter-status').value;
+
+            tbody.innerHTML = '';
+
+            const filtered = records.filter(r => {
+                const matchesSearch = !search ||
+                    [r.site, r.task, r.note, r.resolution].some(v => v && v.toLowerCase().includes(search));
+                const matchesCounty = countyFilter === 'ALL' || r.county === countyFilter;
+                const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
+                return matchesSearch && matchesCounty && matchesStatus;
+            }).sort((a, b) => {
+                // întâi cele de făcut (după dată, cele fără dată la final), apoi rezolvatele, cele mai noi primele
+                if (a.status !== b.status) return a.status === 'Deschis' ? -1 : 1;
+                if (a.status === 'Rezolvat') return (b.resolvedAt || '').localeCompare(a.resolvedAt || '');
+                return (a.date || '9999').localeCompare(b.date || '9999');
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-400">Nu au fost găsite sarcini pentru filtrele selectate.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition';
+                tr.innerHTML = `
+                    <td class="p-3">${statusBadge(r)}</td>
+                    <td class="p-3 font-semibold text-slate-700">${esc(r.county || '-')}</td>
+                    <td class="p-3 font-bold text-slate-800 whitespace-nowrap">${esc(r.site || '-')}</td>
+                    <td class="p-3 text-slate-700 min-w-[180px]">${esc(r.task)}${r.note ? `<div class="text-xs text-slate-500">${esc(r.note)}</div>` : ''}</td>
+                    <td class="p-3 text-slate-600 text-xs whitespace-nowrap">${r.date ? prettyDate(r.date) : 'cândva'}</td>
+                    <td class="p-3 text-slate-600 text-xs min-w-[160px]">${resolutionText(r)}</td>
+                    <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                        ${resolveButton(r, false)}
+                        <button onclick="editRecord('${esc(r.id)}')" title="Editează" class="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-md text-xs">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button onclick="deleteRecord('${esc(r.id)}')" title="Șterge" class="p-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-md text-xs">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        let openModalDate = null;
+
+        function openDayModal(dateStr) {
+            openModalDate = dateStr;
+            const items = records.filter(r => calendarDay(r) === dateStr);
+            document.getElementById('modal-date-title').textContent = `Sarcini în data de ${prettyDate(dateStr)}`;
+            const content = document.getElementById('modal-content');
+            content.innerHTML = '';
+
+            if (items.length === 0) {
+                content.innerHTML = `<p class="text-sm text-slate-500 italic">Nicio sarcină pentru această dată.</p>`;
+            } else {
+                items.forEach(item => {
+                    const tone = item.status === 'Rezolvat' ? 'border-emerald-200 bg-emerald-50' : isOverdue(item) ? 'border-red-200 bg-red-50' : 'border-indigo-200 bg-indigo-50';
+                    const div = document.createElement('div');
+                    div.className = `p-3 rounded-lg border ${tone}`;
+                    div.innerHTML = `
+                        <div class="flex justify-between items-start gap-2 mb-1">
+                            <span class="font-bold text-sm text-slate-800">${item.site ? `${item.county ? `[${esc(item.county)}] ` : ''}${esc(item.site)}` : 'Fără site'}</span>
+                            ${statusBadge(item)}
+                        </div>
+                        <p class="text-sm text-slate-700">${esc(item.task)}</p>
+                        ${item.note ? `<p class="text-xs text-slate-500 mt-1">${esc(item.note)}</p>` : ''}
+                        ${item.status === 'Rezolvat' ? `<p class="text-xs text-emerald-800 mt-1"><i class="fa-solid fa-check mr-1"></i>${prettyDate(item.resolvedAt)}${item.resolution ? ' · ' + esc(item.resolution) : ''}</p>` : ''}
+                        <div class="mt-2 flex flex-wrap gap-2 justify-end">
+                            <button onclick="editRecord('${esc(item.id)}')" class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg"><i class="fa-solid fa-pen mr-1"></i>Editează</button>
+                            ${resolveButton(item, true, dateStr)}
+                        </div>
+                    `;
+                    content.appendChild(div);
+                });
+            }
+            document.getElementById('day-modal').classList.remove('hidden');
+        }
+
+        function addOnModalDate() {
+            const dateStr = openModalDate;
+            closeModal();
+            resetForm();
+            switchTab('calendar');
+            document.getElementById('task-date').value = dateStr;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('site-code').focus();
+        }
+
+        function refreshOpenModal() {
+            if (openModalDate && !document.getElementById('day-modal').classList.contains('hidden')) {
+                openDayModal(openModalDate);
+            }
+        }
+
+        function closeModal() {
+            openModalDate = null;
+            document.getElementById('day-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
