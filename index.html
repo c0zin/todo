@@ -378,45 +378,48 @@
             return false;
         }
 
-        async function fetchDataFromCloud() {
-            if (!scriptConfigured()) return false;
-            try {
-                // adăugăm redirect: 'follow' pentru ca browserul să urmărească redirect-ul intern Google
-                const response = await fetch(`${GOOGLE_SCRIPT_URL}?app=todo&t=${Date.now()}`, {
-                    method: 'GET',
-                    redirect: 'follow'
-                });
-                const result = await response.json();
-                if (result.result !== 'success' || !Array.isArray(result.data)) throw new Error(result.message || 'Răspuns neașteptat');
+async function fetchDataFromCloud() {
+    if (!scriptConfigured()) return false;
+    try {
+        // Folosim POST cu text/plain pentru a evita blocajele CORS stricte de la GET pe Google Apps Script
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ app: 'todo', action: 'get' })
+        });
+        
+        const result = await response.json();
+        if (result.result !== 'success' || !Array.isArray(result.data)) throw new Error(result.message || 'Răspuns neașteptat');
 
-                if (result.sheetUrl) {
-                    const a = document.getElementById('open-sheet-btn');
-                    a.href = result.sheetUrl;
-                    a.classList.remove('hidden');
-                }
+        if (result.sheetUrl) {
+            const a = document.getElementById('open-sheet-btn');
+            a.href = result.sheetUrl;
+            a.classList.remove('hidden');
+        }
 
-                records = result.data
-                    .map(r => ({
-                        id: String(r.ID || ''),
-                        county: countyFromSite(r.Site) || r.Judet || '',
-                        site: r.Site || '',
-                        task: r.Sarcina || '',
-                        date: formatDateStr(r.Data),
-                        status: normalizeStatus(r.Status),
-                        note: r.Notita || '',
-                        resolvedAt: formatDateStr(r.RezolvatLa),
-                        resolution: r.Rezolvare || '',
-                        modifiedAt: r.ModificatLa || ''
-                    }))
-                    .filter(r => r.id && r.task);
+        records = result.data
+            .map(r => ({
+                id: String(r.ID || ''),
+                county: countyFromSite(r.Site) || r.Judet || '',
+                site: r.Site || '',
+                task: r.Sarcina || '',
+                date: formatDateStr(r.Data),
+                status: normalizeStatus(r.Status),
+                note: r.Notita || '',
+                resolvedAt: formatDateStr(r.RezolvatLa),
+                resolution: r.Rezolvare || '',
+                modifiedAt: r.ModificatLa || ''
+            }))
+            .filter(r => r.id && r.task);
 
-                renderApp();
-                return true;
-            } catch (err) {
-                console.error("Eroare la preluarea datelor din Cloud:", err);
-                showSync('Nu s-au putut citi datele din Google Sheets. Verifică conexiunea / publicarea scriptului.', 'error');
-                return false;
-            }
+        renderApp();
+        return true;
+    } catch (err) {
+        console.error("Eroare la preluarea datelor din Cloud:", err);
+        showSync('Nu s-au putut citi datele din Google Sheets. Verifică conexiunea / publicarea scriptului.', 'error');
+        return false;
+    }
+}
         }
 
         async function saveToCloud(actionType, recordData) {
