@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ro" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sarcini & Site-uri - Panou de monitorizare</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#0f172a',
+                            card: '#1e293b',
+                            border: '#334155'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-indigo-500 selection:text-white pb-12">
+
+    <!-- CONFIGURARE URL GOOGLE APPS SCRIPT -->
+    <script>
+        // Pune aici noul tău link generat din Apps Script (cel care se termină în /exec)
+        const GOOGLE_SCRIPT_URL = 'SCHIMBA_CU_LINKUL_TAU_DE_EXEC';
+    </script>
+
+    <!-- Header Principal -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-list-check text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        Sarcini & Site-uri
+                    </h1>
+                    <p class="text-xs text-slate-400">Panou de monitorizare</p>
+                </div>
+            </div>
+
+            <!-- Tab-uri (Calendar & Listă) - Butonul de Sheet a fost eliminat -->
+            <div class="flex items-center gap-2">
+                <div class="bg-slate-900 p-1 rounded-xl flex gap-1 border border-slate-700">
+                    <button id="tab-calendar-btn" onclick="switchTab('calendar')" class="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white transition">
+                        <i class="fa-solid fa-calendar-days mr-1.5"></i> Calendar
+                    </button>
+                    <button id="tab-records-btn" onclick="switchTab('records')" class="px-4 py-2 text-sm font-medium rounded-lg text-slate-300 hover:bg-slate-700 transition">
+                        <i class="fa-solid fa-table-list mr-1.5"></i> Listă (<span id="badge-open-count">0</span>)
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Bar Conexiune -->
+        <div id="sync-status" class="bg-emerald-950/80 border-t border-emerald-800/50 px-4 py-1.5 text-center text-xs font-medium text-emerald-300 flex items-center justify-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Sincronizat cu Google Sheets ✓</span>
+        </div>
+    </header>
+
+    <!-- Conținut Principal -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        
+        <!-- Statistici Sus -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-sm">
+                <p class="text-xs text-slate-400 font-medium">Deschise</p>
+                <p id="stat-open" class="text-2xl font-bold text-white mt-1">0</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-sm">
+                <p class="text-xs text-slate-400 font-medium">Depășite</p>
+                <p id="stat-overdue" class="text-2xl font-bold text-red-400 mt-1">0</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-sm">
+                <p class="text-xs text-slate-400 font-medium">Cândva (fără dată)</p>
+                <p id="stat-someday" class="text-2xl font-bold text-amber-400 mt-1">0</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-sm">
+                <p class="text-xs text-slate-400 font-medium">Rezolvate</p>
+                <p id="stat-resolved" class="text-2xl font-bold text-emerald-400 mt-1">0</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Formular Adăugare / Editare Sarcina -->
+            <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm h-fit">
+                <h2 id="form-title" class="text-base font-bold text-white mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-circle-plus text-indigo-500"></i> Sarcina Nouă
+                </h2>
+                
+                <form id="task-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <input type="hidden" id="task-id">
+                    
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Cod Site / Locație</label>
+                        <input type="text" id="task-site" required placeholder="ex: DJ-Craiova-01" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                        <p class="text-[11px] text-slate-400 mt-1">Județul se detectează din primele 2 litere (DJ, GJ, MH, OT).</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Descriere Sarcina *</label>
+                        <textarea id="task-sarcina" rows="3" required placeholder="Cere detalii despre lucrare..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition resize-none"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Data limită (opțional)</label>
+                        <div class="flex gap-2 mb-2">
+                            <button type="button" onclick="setDatePreset('azi')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded-lg transition border border-slate-700">Azi</button>
+                            <button type="button" onclick="setDatePreset('maine')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded-lg transition border border-slate-700">Mâine</button>
+                            <button type="button" onclick="setDatePreset('candva')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded-lg transition border border-slate-700">Fără dată (Cândva)</button>
+                        </div>
+                        <input type="date" id="task-data" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Notițe / Detalii suplimentare</label>
+                        <input type="text" id="task-notita" placeholder="Alte informații utile..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-2">
+                        <button type="submit" id="submit-btn" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 px-4 rounded-xl transition shadow-lg shadow-indigo-600/30 text-sm">
+                            Salvează Sarcina
+                        </button>
+                        <button type="button" id="cancel-edit-btn" onclick="resetForm()" class="hidden px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl transition">
+                            Anulează
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Zona principală de vizualizare (Calendar sau Listă) -->
+            <div class="lg:col-span-8">
+                
+                <!-- View Calendar -->
+                <div id="view-calendar" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 id="calendar-month-year" class="text-lg font-bold text-white capitalize">Lună An</h2>
+                        <div class="flex items-center gap-1">
+                            <button onclick="changeMonth(-1)" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                            <button onclick="goToToday()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-medium text-slate-300 transition">Astăzi</button>
+                            <button onclick="changeMonth(1)" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                        </div>
+                    </div>
+
+                    <!-- Zilele săptămânii -->
+                    <div class="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400 mb-2">
+                        <div>Lun</div><div>Mar</div><div>Mie</div><div>Joi</div><div>Vin</div><div>Sâm</div><div>Dum</div>
+                    </div>
+
+                    <!-- Zilele din calendar -->
+                    <div id="calendar-grid" class="grid grid-cols-7 gap-1.5">
+                        <!-- Generat din JS -->
+                    </div>
+                </div>
+
+                <!-- View Lista (ascuns inițial) -->
+                <div id="view-records" class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-base font-bold text-white">Toate Sarcinile</h2>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="search-input" oninput="renderRecords()" placeholder="Caută..." class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                                <tr>
+                                    <th class="p-3">Județ</th>
+                                    <th class="p-3">Site</th>
+                                    <th class="p-3">Sarcina</th>
+                                    <th class="p-3">Data</th>
+                                    <th class="p-3">Status</th>
+                                    <th class="p-3 text-right">Acțiuni</th>
+                                </tr>
+                            </thead>
+                            <tbody id="records-tbody" class="divide-y divide-slate-800">
+                                <!-- Generat din JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Scriptul Aplicației -->
+    <script>
+        let tasks = [];
+        let currentTab = 'calendar';
+        let currentDate = new Date();
+        let editingId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchTasks();
+        });
+
+        function switchTab(tab) {
+            currentTab = tab;
+            const calBtn = document.getElementById('tab-calendar-btn');
+            const recBtn = document.getElementById('tab-records-btn');
+            const calView = document.getElementById('view-calendar');
+            const recView = document.getElementById('view-records');
+
+            if (tab === 'calendar') {
+                calBtn.className = "px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white transition";
+                recBtn.className = "px-4 py-2 text-sm font-medium rounded-lg text-slate-300 hover:bg-slate-700 transition";
+                calView.classList.remove('hidden');
+                recView.classList.add('hidden');
+                renderCalendar();
+            } else {
+                recBtn.className = "px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white transition";
+                calBtn.className = "px-4 py-2 text-sm font-medium rounded-lg text-slate-300 hover:bg-slate-700 transition";
+                recView.classList.remove('hidden');
+                calView.classList.add('hidden');
+                renderRecords();
+            }
+        }
+
+        async function fetchTasks() {
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.includes('SCHIMBA')) return;
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'get', app: 'todo' })
+                });
+                const res = await response.json();
+                if (res.result === 'success') {
+                    tasks = res.data || [];
+                    updateStats();
+                    if (currentTab === 'calendar') renderCalendar();
+                    else renderRecords();
+                }
+            } catch (err) {
+                console.error("Eroare preluare date:", err);
+            }
+        }
+
+        async function saveTask(taskData) {
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ ...taskData, app: 'todo' })
+                });
+                const res = await response.json();
+                if (res.result === 'success') {
+                    await fetchTasks();
+                } else {
+                    alert("Eroare la salvarea în cloud: " + res.message);
+                }
+            } catch (err) {
+                console.error("Eroare salvare:", err);
+                alert("Eroare de rețea la salvare.");
+            }
+        }
+
+        async function deleteTask(id) {
+            if (!confirm("Sigur dorești să ștergi această sarcină?")) return;
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'delete', id: id, app: 'todo' })
+                });
+                const res = await response.json();
+                if (res.result === 'success') {
+                    await fetchTasks();
+                }
+            } catch (err) {
+                console.error("Eroare ștergere:", err);
+            }
+        }
+
+        function extractCounty(site) {
+            if (!site) return 'N/A';
+            const prefix = site.substring(0, 2).toUpperCase();
+            if (['DJ', 'GJ', 'MH', 'OT'].includes(prefix)) return prefix;
+            return 'Altele';
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const site = document.getElementById('task-site').value.trim();
+            const sarcina = document.getElementById('task-sarcina').value.trim();
+            const data = document.getElementById('task-data').value.trim();
+            const notita = document.getElementById('task-notita').value.trim();
+            const judet = extractCounty(site);
+
+            const taskObj = {
+                id: editingId || ('T_' + Date.now()),
+                judet: judet,
+                site: site,
+                sarcina: sarcina,
+                data: data,
+                status: editingId ? (tasks.find(t => t.ID === editingId)?.Status || 'Deschis') : 'Deschis',
+                notita: notita,
+                modificatLa: new Date().toISOString()
+            };
+
+            saveTask(taskObj);
+            resetForm();
+        }
+
+        function resetForm() {
+            editingId = null;
+            document.getElementById('task-form').reset();
+            document.getElementById('task-id').value = '';
+            document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-circle-plus text-indigo-500"></i> Sarcina Nouă`;
+            document.getElementById('submit-btn').innerText = "Salvează Sarcina";
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+        }
+
+        function setDatePreset(type) {
+            const today = new Date();
+            if (type === 'azi') {
+                document.getElementById('task-data').value = today.toISOString().split('T')[0];
+            } else if (type === 'maine') {
+                today.setDate(today.getDate() + 1);
+                document.getElementById('task-data').value = today.toISOString().split('T')[0];
+            } else if (type === 'candva') {
+                document.getElementById('task-data').value = '';
+            }
+        }
+
+        function updateStats() {
+            let open = 0, overdue = 0, someday = 0, resolved = 0;
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            tasks.forEach(t => {
+                if (t.Status === 'Rezolvat') {
+                    resolved++;
+                } else {
+                    open++;
+                    if (!t.Data) {
+                        someday++;
+                    } else if (t.Data < todayStr) {
+                        overdue++;
+                    }
+                }
+            });
+
+            document.getElementById('stat-open').innerText = open;
+            document.getElementById('stat-overdue').innerText = overdue;
+            document.getElementById('stat-someday').innerText = someday;
+            document.getElementById('stat-resolved').innerText = resolved;
+            document.getElementById('badge-open-count').innerText = open;
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+            
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            
+            const monthNames = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
+            document.getElementById('calendar-month-year').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7;
+            const totalDays = new Date(year, month + 1, 0).getDate();
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            // Zilegoale început
+            for (let i = 0; i < firstDayIndex; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = "bg-slate-950/40 rounded-xl min-h-[90px] opacity-30";
+                grid.appendChild(emptyCell);
+            }
+
+            for (let day = 1; day <= totalDays; day++) {
+                const dayStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const cell = document.createElement('div');
+                cell.className = "bg-slate-950 border border-slate-800 rounded-xl p-2 min-h-[90px] flex flex-col justify-between overflow-hidden";
+                
+                const dayHeader = document.createElement('div');
+                dayHeader.className = "flex justify-between items-center text-xs mb-1";
+                
+                const isToday = (dayStr === todayStr);
+                dayHeader.innerHTML = `<span class="font-bold ${isToday ? 'bg-indigo-600 text-white px-1.5 py-0.5 rounded-md' : 'text-slate-400'}">${day}</span>`;
+                cell.appendChild(dayHeader);
+
+                const dayTasksContainer = document.createElement('div');
+                dayTasksContainer.className = "space-y-1 overflow-y-auto max-h-[70px]";
+
+                const dayTasks = tasks.filter(t => t.Data === dayStr);
+                dayTasks.forEach(t => {
+                    const badge = document.createElement('div');
+                    const isResolved = t.Status === 'Rezolvat';
+                    badge.className = `text-[10px] px-1.5 py-1 rounded truncate cursor-pointer font-medium ${isResolved ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 line-through' : 'bg-slate-800 text-slate-200 border border-slate-700 hover:border-indigo-500'}`;
+                    badge.innerText = `${t.Site}: ${t.Sarcina}`;
+                    badge.title = t.Sarcina;
+                    badge.onclick = () => toggleTaskStatus(t.ID);
+                    dayTasksContainer.appendChild(badge);
+                });
+
+                cell.appendChild(dayTasksContainer);
+                grid.appendChild(cell);
+            }
+        }
+
+        function changeMonth(dir) {
+            currentDate.setMonth(currentDate.getMonth() + dir);
+            renderCalendar();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            renderCalendar();
+        }
+
+        async function toggleTaskStatus(id) {
+            const task = tasks.find(t => t.ID === id);
+            if (!task) return;
+            task.Status = task.Status === 'Rezolvat' ? 'Deschis' : 'Rezolvat';
+            task.ModificatLa = new Date().toISOString();
+            await saveTask(task);
+        }
+
+        function renderRecords() {
+            const tbody = document.getElementById('records-tbody');
+            tbody.innerHTML = '';
+            const search = document.getElementById('search-input').value.toLowerCase();
+
+            const filtered = tasks.filter(t => 
+                (t.Site && t.Site.toLowerCase().includes(search)) || 
+                (t.Sarcina && t.Sarcina.toLowerCase().includes(search)) ||
+                (t.Judet && t.Judet.toLowerCase().includes(search))
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">Nicio sarcină găsită.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(t => {
+                const tr = document.createElement('tr');
+                const isResolved = t.Status === 'Rezolvat';
+                tr.className = "hover:bg-slate-950/50 transition";
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-white">${t.Judet || '-'}</td>
+                    <td class="p-3 text-slate-300">${t.Site || '-'}</td>
+                    <td class="p-3 text-slate-300 ${isResolved ? 'line-through text-slate-500' : ''}">${t.Sarcina || '-'}</td>
+                    <td class="p-3 text-slate-400">${t.Data || 'Cândva'}</td>
+                    <td class="p-3">
+                        <span class="px-2 py-1 rounded-md text-[10px] font-medium ${isResolved ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-amber-950 text-amber-300 border border-amber-800'}">
+                            ${t.Status || 'Deschis'}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right space-x-2">
+                        <button onclick="toggleTaskStatus('${t.ID}')" class="text-slate-400 hover:text-emerald-400 transition" title="Schimbă status"><i class="fa-solid fa-check"></i></button>
+                        <button onclick="deleteTask('${t.ID}')" class="text-slate-400 hover:text-red-400 transition" title="Șterge"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    </script>
+</body>
+</html>
